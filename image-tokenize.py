@@ -1,22 +1,26 @@
+import imagehash
 import imageio.v3 as iio
 import numpy as np
+import os
 
 # TODO: Take these constants as command line arguments
 filename = "mit_2024_i_write_these_words.png"
-bg_color = np.array([255,255,255])
+bg_color = np.array([255, 255, 255])
 min_height = 40
 ignore_alpha = True
 
 # Debug output
 debug_find_rows = False
 debug_find_chars = False
-debug_trim = False
-debug_char_map = True
+debug_write_image_files = False
+debug_trim = True
+debug_char_map = False
+
 
 # trimImage removed empty rows and columns from the border of an image
 # Input:
 #     Type <pixel> is an np.ndarray corresponding to the number of bytes in a pixel of the image
-#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a 
+#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a
 #            constant background color. Rows of characters are separated by
 #            at least one line of solid bgcolor pixels
 #     background: pixel (np.ndarray)
@@ -35,19 +39,20 @@ def trimImage(image, background):
             if first_row < 0:
                 first_row = idx
     for idx in range(col_count):
-        column = image[:,idx,:]
+        column = image[:, idx, :]
         blank = (column == background).all()
         if not blank:
             last_col = idx
             if first_col < 0:
                 first_col = idx
-    return image[first_row:last_row+1,first_col:last_col+1]
+    return image[first_row : last_row + 1, first_col : last_col + 1]
 
-# horizontalSegments finds rows of characters in the source image and returns 
-# then as an array.  
+
+# horizontalSegments finds rows of characters in the source image and returns
+# then as an array.
 # Input:
 #     Type <pixel> is an np.ndarray corresponding to the number of bytes in a pixel of the image
-#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a 
+#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a
 #            constant background color. Rows of characters are separated by
 #            at least one line of solid bgcolor pixels
 #     background: pixel (np.ndarray)
@@ -55,7 +60,7 @@ def trimImage(image, background):
 #            the row will continue until that many are found. Defaults to 1.
 # Return:
 #     List of image np.ndarray<pixel>
-def horizontalSegments(image, background, minimum_height = 1):
+def horizontalSegments(image, background, minimum_height=1):
     image_rows = []
     found_char = False
     start = -1
@@ -81,33 +86,34 @@ def horizontalSegments(image, background, minimum_height = 1):
         image_rows.append(image[start:])
     return image_rows
 
-# verticalSegments finds rows of characters in the source image and returns 
-# then as an array.  
+
+# verticalSegments finds rows of characters in the source image and returns
+# then as an array.
 # Input:
 #     Type <pixel> is an np.ndarray corresponding to the number of bytes in a pixel of the image
-#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a 
+#     image: np.ndarray[rows, cols]<pixel> - an image containing a series of characters on a
 #            constant background color. Rows of characters are separated by
 #            at least one line of solid bgcolor pixels
 #     background: pixel (np.ndarray)
 #     trim: Should empty rows/columns be removed from images after tokenizing? Defaults to True.
-#     minimum_width: minimum character width. If a segment is detected with fewer than this number 
+#     minimum_width: minimum character width. If a segment is detected with fewer than this number
 #            of pixels, the row will continue until that many are found. Defaults to 1.
 # Return:
 #     List of image np.ndarray<pixel>
-def verticalSegments(image, background, trim = True, minimum_width = 1):
+def verticalSegments(image, background, trim=True, minimum_width=1):
     row_count, col_count, _ = image.shape
     found_char = False
     chars = []
     start = -1
     for idx in range(col_count):
-        column = image[:,idx,:]
+        column = image[:, idx, :]
         blank = (column == background).all()
         if blank and found_char:
             width = (idx - start) + 1
             if width < minimum_width:
                 continue
             # We have reached the end of a character
-            char = image[:,start:idx]
+            char = image[:, start:idx]
             chars.append(trimImage(char, background))
             if debug_find_chars:
                 print("Found char from column ", start, " to column ", idx)
@@ -120,31 +126,37 @@ def verticalSegments(image, background, trim = True, minimum_width = 1):
     if found_char:
         if debug_find_chars:
             print("Found chars from col ", start, " to end")
-        char = image[:,start:]
+        char = image[:, start:]
         chars.append(trimImage(char, background))
     return chars
 
-# ImageToLetterMap represents a map from an image to a latin letter which can be used in a 
+
+# dumpCharsToFile dumps images of the extracted characters
+# Input:
+#    imageRows: list of arrays of images
+#    prefix: string
+def dumpCharsToFiles(imageRows, prefix=""):
+    for rowIdx, row in enumerate(image_rows):
+        for charIdx, char in enumerate(row):
+            name = "{prefix}r{rowIdx}c{charIdx}.png".format(prefix, rowIdx, charIdx)
+            iio.imwrite(name, char)
+
+
+# ImageToLetterMap represents a map from an image to a latin letter which can be used in a
 # cryptogram
 class ImageToLetterMap:
-    upper_case = [
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-        'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
-    ]
+    upper_case = [*"ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
 
-    lower_case = [
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-        'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'
-    ]
+    lower_case = [*"abcdefghijklmnopqrstuvwxyz"]
 
-    numbers = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    numbers = [*"0123456789"]
 
     # Initialize a map from an array of image
     # Input:
-    #     images: An iterable (numpy array or list) of images, where an image is 
+    #     images: An iterable (numpy array or list) of images, where an image is
     #             np.ndarray[rows, cols]<pixel>
     #     output_chars: list of characters valid as output
-    def __init__(self, images = [], output_chars = upper_case):
+    def __init__(self, images=[], output_chars=upper_case):
         self.__valid_characters = output_chars
         # TODO: ensure every entry in output_chars is unique
         self.__lookup = {}
@@ -152,9 +164,9 @@ class ImageToLetterMap:
         for im in images:
             self.ensureExists(im)
 
-    # Ensure a record for an image exists in the map. 
+    # Ensure a record for an image exists in the map.
     # Input:
-    #     images: An iterable (numpy array or list) of images, where an image is 
+    #     images: An iterable (numpy array or list) of images, where an image is
     #             np.ndarray[rows, cols]<pixel>
     # Return:
     #     Boolean: whether the element existed before calling this function
@@ -190,11 +202,22 @@ class ImageToLetterMap:
     def ImageHash(image):
         return ImageToLetterMap.__imageHash(image)
 
+
 # https://imageio.readthedocs.io/
 im = iio.imread(filename)
+
 if ignore_alpha:
     # Remove the alpha channel
-    im = im[:,:,:3]
+    # Note: only the rightmost column and bottom row are translucent. The subpixels
+    # are not
+    im = im[:, :, :3]
+
+# DO_NOT_SUBMIT: Experimentation
+fg_color = np.array([0, 0, 0])
+for rowIdx, row in enumerate(im):
+    for colIdx, pixel in enumerate(row):
+        if (pixel != fg_color).any():
+            im[rowIdx][colIdx] = bg_color
 
 image_rows_raw = horizontalSegments(im, bg_color, min_height)
 if debug_find_rows:
@@ -203,34 +226,86 @@ if debug_find_rows:
         print(row.shape)
 
 image_rows = list(map(lambda r: verticalSegments(r, bg_color), image_rows_raw))
+
+if debug_write_image_files:
+    # Calculate distinct image shapes
+    dimensionMap = {}
+    for rowIdx, row in enumerate(image_rows):
+        for charIdx, char in enumerate(row):
+            dims = str(char.shape)
+            filename = "r{0}c{1}".format(rowIdx, charIdx)
+            dirname = "{0}x{1}".format(char.shape[0], char.shape[1])
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+            iio.imwrite("{0}/{1}.png".format(dirname, filename), char)
+
+            if dims in dimensionMap:
+                dimensionMap[dims].append(filename)
+            else:
+                dimensionMap[dims] = [filename]
+    print(len(dimensionMap), " unique dimensions")
+    print(dimensionMap)
+
+    # Notes: 31 shapes found.
+    # Shapes split into multiple:
+    # 36x36 and 36x37 should be merged
+    # 29x30 and 29x31 should be merged
+    # 30x30, 30x31
+    # 31x29, 31x30
+    # 31x32, 31x33
+    # Shapes with multiple things:
+    # 30x30
+    # 31x30
+    # 31x31
+
+    # thoughts: if we crop this tightly we can't rely on image similarity images which require identical size
+    # more advanced algorithms are better on photos but could be tried
+    # Can we prune the subpixels?  What about a mask of "equals background or not"?
+    #    -this clearly won't fix the different size issue, so apparently that won't be sufficient
+    # Pruning any pixels not equal to (0,0,0) makes it worse - 47 distinct shapes rather than 31
+    # The subpixels don't have alpha so we can't prune them that way
+    # the answer is probably threshold math BUT how do we detect the cases where they're different sizes?
+    # The search space (size 26) is small enough that what we can probably do is something like:
+    # Add or subtract 1px from each edge (3^4 = 81 cases)
+    #   add all those cases as the same letter in the hash table
+    #   do difference math on any table hits of the same size and match if below a threshold
+
 if debug_find_chars:
     for r, row in enumerate(image_rows):
         print("Row ", r, " contains ", len(row), " characters")
+
 if debug_trim:
     for r, row in enumerate(image_rows):
         sizes = list(map(lambda r: r.shape, row))
         print("Row ", r, " sizes: ", sizes)
+    # TODO: Row 0 characters 3, 6, 16 should be identical.  Confirm that they are being detected as such.
+    # They have different sizes:
+    # 4: (33, 27, 3)
+    # 6: (35, 37, 3)
+    # 16: (33, 32, 3)
+    # Guess I'll have to dump to images and inspect
+    # Another reason to look into image similarity....
+    # OK, so the answer is subpixel aliasing.  Ugh.
+    # row0 = image_rows[0]
+    # r0c04 = row0[4]
+    # r0c06 = row0[6]
+    # r0c16 = row0[16]
+    # iio.imwrite("r0c04.png", r0c04)
+    # iio.imwrite("r0c06.png", r0c06)
+    # iio.imwrite("r0c16.png", r0c16)
+    # hash04 = ImageToLetterMap.ImageHash(r0c04)
+    # hash06 = ImageToLetterMap.ImageHash(r0c06)
+    # hash16 = ImageToLetterMap.ImageHash(r0c16)
+    # print("4=6: ", hash04 == hash06)
+    # print("4=16: ", hash04 == hash16)
+    # print("6=16: ", hash06 == hash16)
+    # print(r0c04.shape)
+    # print(r0c06.shape)
+    # print(r0c16.shape)
 
-char_map = ImageToLetterMap(output_chars = ImageToLetterMap.upper_case + ImageToLetterMap.lower_case)
-
-# TODO: Row 0 characters 5, 7, 17 should be identical.  Confirm that they are being detected as such.
-# They have different sizes: 
-# 5: (33, 27, 3)
-# 7: (35, 37, 3)
-# 17: (33, 32, 3)
-# Guess I'll have to dump to images and inspect
-# Another reason to look into image similarity....
-# row0 = image_rows[0]
-# hash5 = ImageToLetterMap.ImageHash(row0[5])
-# print(type(hash5))
-# hash7 = ImageToLetterMap.ImageHash(row0[7])
-# hash17 = ImageToLetterMap.ImageHash(row0[17])
-# print("5=7: ", hash5 == hash7)
-# print("5=17: ", hash5 == hash17)
-# print("7=17: ", hash7 == hash17)
-# print("5: \n", hash5, "\n\n")
-# print("7: \n", hash7, "\n\n")
-# print("17: \n", hash17, "\n\n")
+char_map = ImageToLetterMap(
+    output_chars=ImageToLetterMap.upper_case + ImageToLetterMap.lower_case
+)
 
 # TODO: Refactor this into the ImageToLetterMap class once a good signature to handle
 # lists and ndarray is determined

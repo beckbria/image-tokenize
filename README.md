@@ -28,5 +28,5 @@ sets as an alternative to manually transcribing images.
 ## Setup
 
 ```sh
-sudo apt install python3 python3-pip && pip3 install numpy imageio
+sudo apt install python3 python3-pip && pip3 install numpy imageio imagehash
 ```

@@ -30,3 +30,8 @@ sets as an alternative to manually transcribing images.
 ```sh
 sudo apt install python3 python3-pip && pip3 install numpy imageio imagehash
 ```
+
+## Style Guide
+
+This project is formatted with the default settings from the Black Formatter extension
+in Visual Studio Code.

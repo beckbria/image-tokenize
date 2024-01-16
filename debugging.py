@@ -65,3 +65,8 @@ def verifyEqualGlyphs(image_rows_pil):
     print("4=6: ", hash04 == hash06)
     print("4=16: ", hash04 == hash16)
     print("6=16: ", hash06 == hash16)
+
+
+# Notes:
+# Comparing the raw bytes falls apart because of subpixel color differences
+# crop_resistant_hash is too lenient

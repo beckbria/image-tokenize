@@ -31,10 +31,8 @@ class ImageToLetterMap:
             self.ensureExists(im)
 
     # Ensure a record for an image exists in the map.
-    # Input:
-    #     image: A PIL Image or a list of PIL images
-    # Return:
-    #     Boolean: whether the element existed before calling this function
+    # Input: image_pil: A PIL Image or a list of PIL images
+    # Return: The letter corresponding to this image
     def ensureExists(self, image_pil):
         if isinstance(image_pil, list):
             ret = True
@@ -45,42 +43,38 @@ class ImageToLetterMap:
         if type(image_pil) is not Image.Image:
             raise Exception("Image of incorrect type " + str(type(image_pil)))
 
-        if self.get(image_pil) is not None:
-            return True
+        hash = ImageToLetterMap.__imageHash(image_pil)
+        existing = self.__get(hash)
+        if existing is not None:
+            # DO_NOT_SUBMIT
+            print("Found duplicate ", existing)
+            return existing
 
         if self.__next_char_index >= len(self.__valid_characters):
             raise Exception("Too many distinct images")
 
-        self.__lookup.append(
-            ImageToLetterMapEntry(
-                hash=ImageToLetterMap.__imageHash(image_pil),
-                letter=self.__valid_characters[self.__next_char_index],
-            )
-        )
+        letter = self.__valid_characters[self.__next_char_index]
+        # DO_NOT_SUBMIT
+        print("Inserting letter ", letter)
+        self.__lookup.append(ImageToLetterMapEntry(hash=hash, letter=letter))
         self.__next_char_index = self.__next_char_index + 1
-        return False
+        return letter
 
     def get(self, image_pil):
-        hash = ImageToLetterMap.__imageHash(image_pil)
+        return self.__get(ImageToLetterMap.__imageHash(image_pil))
+
+    def __get(self, hash):
         for known in self.__lookup:
             if known.hash == hash:
                 return known.letter
         return None
 
-    # __imageHash produces a hash of an ndarray which can be used as the key in a hash table
-    # Input:
-    #
-    # Return:
-    #   hash: byte array
     @staticmethod
     def __imageHash(image_pil):
-        # Identifying different images is an interesting problem:
-        #   * ndarray.toBytes() is tempting but sinze our characters can be of different sizes this
-        #     is dangerous i.e. np.zeroes(3,2) has the same bytes as np.zeroes(2,3)
-        #   * Stringifying is huge and expensive
-        # Proposal: Use the bytes representation with the dimensions prepended
-        # return str.encode(str(image.shape)) + image.tobytes()
-        return imagehash.crop_resistant_hash(image_pil)
+        # Too Permissive
+        # return imagehash.crop_resistant_hash(image_pil)
+        # Doesn't tolerate different subpixel crops
+        # return imagehash.average_hash(image_pil)
 
     # REMOVE AFTER DEBUGGING: Public version of the private hash function for testing
     @staticmethod

@@ -1,6 +1,12 @@
 import imagehash
 
 
+class ImageToLetterMapEntry:
+    def __init__(self, hash, letter):
+        self.hash = hash
+        self.letter = letter
+
+
 # ImageToLetterMap represents a map from an image to a latin letter which can be used in a
 # cryptogram
 class ImageToLetterMap:
@@ -18,7 +24,7 @@ class ImageToLetterMap:
     def __init__(self, images=[], output_chars=upper_case):
         self.__valid_characters = output_chars
         # TODO: ensure every entry in output_chars is unique
-        self.__lookup = {}
+        self.__lookup = []
         self.__next_char_index = 0
         for im in images:
             self.ensureExists(im)
@@ -32,17 +38,28 @@ class ImageToLetterMap:
         if type(image) is list:
             for im in image:
                 self.ensureExists(im)
-        hash = ImageToLetterMap.__imageHash(image)
-        if hash in self.__lookup:
+
+        if self.get(image) is not None:
             return True
+
         if self.__next_char_index >= len(self.__valid_characters):
             raise Exception("Too many distinct images")
-        self.__lookup[hash] = self.__valid_characters[self.__next_char_index]
+
+        self.__lookup.append(
+            ImageToLetterMapEntry(
+                hash=ImageToLetterMap.__imageHash(image),
+                letter=self.__valid_characters[self.__next_char_index],
+            )
+        )
         self.__next_char_index = self.__next_char_index + 1
         return False
 
     def get(self, image):
-        return self.__lookup[ImageToLetterMap.__imageHash(image)]
+        hash = ImageToLetterMap.__imageHash(image)
+        for known in self.__lookup:
+            if known.hash == hash:
+                return known.letter
+        return None
 
     # __imageHash produces a hash of an ndarray which can be used as the key in a hash table
     # Input:

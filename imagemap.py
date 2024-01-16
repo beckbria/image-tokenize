@@ -25,11 +25,13 @@ class ImageToLetterMap:
 
     # Ensure a record for an image exists in the map.
     # Input:
-    #     images: An iterable (numpy array or list) of images, where an image is
-    #             np.ndarray[rows, cols]<pixel>
+    #     image: A PIL Image or a list of PIL images
     # Return:
     #     Boolean: whether the element existed before calling this function
     def ensureExists(self, image):
+        if type(image) is list:
+            for im in image:
+                self.ensureExists(im)
         hash = ImageToLetterMap.__imageHash(image)
         if hash in self.__lookup:
             return True
@@ -54,7 +56,8 @@ class ImageToLetterMap:
         #     is dangerous i.e. np.zeroes(3,2) has the same bytes as np.zeroes(2,3)
         #   * Stringifying is huge and expensive
         # Proposal: Use the bytes representation with the dimensions prepended
-        return str.encode(str(image.shape)) + image.tobytes()
+        # return str.encode(str(image.shape)) + image.tobytes()
+        return imagehash.crop_resistant_hash(image)
 
     # REMOVE AFTER DEBUGGING: Public version of the private hash function for testing
     @staticmethod

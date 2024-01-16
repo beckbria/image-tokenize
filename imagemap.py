@@ -1,4 +1,5 @@
 import imagehash
+from PIL import Image
 
 
 class ImageToLetterMapEntry:
@@ -34,12 +35,17 @@ class ImageToLetterMap:
     #     image: A PIL Image or a list of PIL images
     # Return:
     #     Boolean: whether the element existed before calling this function
-    def ensureExists(self, image):
-        if type(image) is list:
-            for im in image:
-                self.ensureExists(im)
+    def ensureExists(self, image_pil):
+        if isinstance(image_pil, list):
+            ret = True
+            for im in image_pil:
+                ret = self.ensureExists(im) and ret
+            return ret
 
-        if self.get(image) is not None:
+        if type(image_pil) is not Image.Image:
+            raise Exception("Image of incorrect type " + str(type(image_pil)))
+
+        if self.get(image_pil) is not None:
             return True
 
         if self.__next_char_index >= len(self.__valid_characters):
@@ -47,15 +53,15 @@ class ImageToLetterMap:
 
         self.__lookup.append(
             ImageToLetterMapEntry(
-                hash=ImageToLetterMap.__imageHash(image),
+                hash=ImageToLetterMap.__imageHash(image_pil),
                 letter=self.__valid_characters[self.__next_char_index],
             )
         )
         self.__next_char_index = self.__next_char_index + 1
         return False
 
-    def get(self, image):
-        hash = ImageToLetterMap.__imageHash(image)
+    def get(self, image_pil):
+        hash = ImageToLetterMap.__imageHash(image_pil)
         for known in self.__lookup:
             if known.hash == hash:
                 return known.letter
@@ -67,16 +73,16 @@ class ImageToLetterMap:
     # Return:
     #   hash: byte array
     @staticmethod
-    def __imageHash(image):
+    def __imageHash(image_pil):
         # Identifying different images is an interesting problem:
         #   * ndarray.toBytes() is tempting but sinze our characters can be of different sizes this
         #     is dangerous i.e. np.zeroes(3,2) has the same bytes as np.zeroes(2,3)
         #   * Stringifying is huge and expensive
         # Proposal: Use the bytes representation with the dimensions prepended
         # return str.encode(str(image.shape)) + image.tobytes()
-        return imagehash.crop_resistant_hash(image)
+        return imagehash.crop_resistant_hash(image_pil)
 
     # REMOVE AFTER DEBUGGING: Public version of the private hash function for testing
     @staticmethod
-    def ImageHash(image):
-        return ImageToLetterMap.__imageHash(image)
+    def ImageHash(image_pil):
+        return ImageToLetterMap.__imageHash(image_pil)

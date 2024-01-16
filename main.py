@@ -12,7 +12,7 @@ min_height = 40
 
 # Debug output
 debug_write_image_files = False
-debug_trim = True
+debug_trim = False
 
 # https://imageio.readthedocs.io/
 im_numpy = iio.imread(filename)
